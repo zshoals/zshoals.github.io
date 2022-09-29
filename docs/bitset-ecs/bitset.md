@@ -68,7 +68,7 @@ In our ECS, queries are not cached and are generated on demand. They do not perf
 TODO: FILL ME IN ok
 
 # The Summary So Far, Because That Was a Lot of Words
-Entities are an unsigned 64-bit integer, with the 64-bits split between a generation that signifies the "uniqueness" of an entity, and a handle which indexes into component data arrays and component bitsets. We'll have a bitset that indicates the active and inactive state of these entities. There will be a "global" storage for these entities so that we can actually keep track of the generation and increment it. We'll maintain a freelist of entities so that can hand out unused entities very quickly.
+Entities are an unsigned 64-bit integer, with the 64-bits split between a generation that signifies the "uniqueness" of an entity, and a handle which indexes into component data arrays and component bitsets. We'll have a bitset that indicates the active and inactive state of these entities. There will be a "global" storage for these entities so that we can actually keep track of the generation and increment it. We'll maintain a freelist of entities so that we can hand out unused entities very quickly.
 
 Components are data stores accessed by an entity handle, combined with a bitset indicating whether an entity currently has the component. They always hold MAX_ENTITIES worth of their component type, all pre-allocated. If accessing a component via a stored entity, a check against the stored entity's generation and the global version of the entity's generation must be performed. 
 
