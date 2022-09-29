@@ -20,7 +20,7 @@ There are many varieties or ECS designs, and you can research some of these keyw
 The general idea behind this bitset design is fairly simple but that does not mean I can explain everything we're doing in 20 words unfortunately. Let's break it down:
 
 # Entities
-Entities will be represented as an index into a particular component array slot, combined with a **generation**. Both the entity ID/handle and generation will be stored in a single unsigned 64-bit integer. The ID portion will be stored in the lower bits of the integer, and the generation in the upper bits of the integer. How many bits are consumed by the ID and how many by the generation are up to you, but general limitations of the bitset ECS design will likely lead you to have a rather small ID limit and a very massive generation limit.
+Entities will be represented as an index into a particular component array slot (or a component's bitset, which we'll get to), combined with a **generation**. Both the entity ID/handle and generation will be stored in a single unsigned 64-bit integer. The ID portion will be stored in the lower bits of the integer, and the generation in the upper bits of the integer. How many bits are consumed by the ID and how many by the generation are up to you, but general limitations of the bitset ECS design will likely lead you to have a rather small ID limit and a very massive generation limit.
 
 A generation is a value that represents a reused entity as a conceptually new object. The generation concept arises naturally from a pretty major problem; pretend we store Entity_A in a component to use for later, maybe as a pathfinding target for another entity. If a random system kills/deletes/removes/recycles Entity_A and it becomes Entity_A++ from a global standpoint, and we attempt to use the stored Entity_A...what happens? Entity_A is dead; it's been replaced with Entity_A++. We need a way to distinguish between the two, and that's the problem the generation solves. 
 
@@ -39,7 +39,7 @@ Components will be one-time-allocated data arrays consisting of MAX_ENTITIES wor
 
 Someone will point out that this wastes a lot of memory, and that the data we will be iterating over in the future will not be tightly packed together. You are correct. However, our focus is not maximal performance or minimum memory usage; it's ease of implementation while gaining the benefits of the ECS design pattern. Additionally, I've run some math on the memory usage before. Even in very pessimistic cases (but like, actually reality based, so again no 10000000000000 element boids simulation), you're using maybe 150 megabytes of RAM total for the entire ECS state, with a lot of it unused. That's like half of a Firefox tab, so I'm not really going to cry about it. If you absolutely need to minimize memory usage, or you need really high entity counts with an absolutely metric ton of unique non-tag data-carrying components, this is not the implementation for you.
 
-There's not really to much to components; they're just arrays of data that you can index into via the ID bits of an entity.
+There's not really to much to components; they're just arrays of data that you can index into via the ID bits of an entity. The main catch here comes from the entity side; we have to make sure that entities that have been stored perform a check against the global entity generation first, to make sure that entity is permitted to access the component storage.
 
 # Tags
 Tags are special cased components. They're often used as on/off flags to indicate functionality that an entity may have (Movable, Rotatable, CanShoot, etc.). In our bitset ECS, we'll simply treat a tag as a component with empty data storage and only the bitset available to use.
@@ -48,7 +48,7 @@ Tags are special cased components. They're often used as on/off flags to indicat
 Systems can do anything; they're just data-processing functions, so you might see operations in them like modifying component data via an entity index, creating new entities, deleting entities, interfacing with other functionality of a library like SDL, whatever. They're usually going to be paired with a query, but that's not strictly necessary.
 
 # Queries
-Queries are a way to search for the particular entity handles that you are interested in processing at any given time. If we wanted to match all Active Entities with the components Position and Rotatable, and the tag Enemy, but excluding Bosses, a query would give us all entities that match these search parameters.
+Queries are a way to search for the particular entity handles that you are interested in processing at any given time. If we wanted to match all Active Entities with the components Position and FireDamageReduction, and the tag Enemy, but excluding Bosses, a query would give us all entities that match these search parameters.
 
 In our ECS, the entity active/inactive bitset combined with the component array bitsets will be used to generate queries. Starting with the entity bitset, we'll perform bitwise and/or/not operations against every component type that we may/may not be interested in. After we've performed all of our query operations, we'll iterate over the resulting bitset which will conveniently contain entities matching our query terms, extracting entity IDs along the way. 
 
@@ -62,3 +62,20 @@ Using bitsets to generate these queries is excellent for several reasons, most n
 
 You might now understand why we organized our bitsets as belonging to the component arrays rather than to the entities themselves; easy, fast, and cheap querying is the reason why.
 
+In our ECS, queries are not cached and are generated on demand. They do not perform "live-updates," so any entity creation or deletion will not be visible until another query is executed.
+
+# World
+TODO: FILL ME IN ok
+
+# The Summary So Far, Because That Was a Lot of Words
+Entities are an unsigned 64-bit integer, with the 64-bits split between a generation that signifies the "uniqueness" of an entity, and a handle which indexes into component data arrays and component bitsets. We'll have a bitset that indicates the active and inactive state of these entities. There will be a "global" storage for these entities so that we can actually keep track of the generation and increment it. We'll maintain a freelist of entities so that can hand out unused entities very quickly.
+
+Components are data stores accessed by an entity handle, combined with a bitset indicating whether an entity currently has the component. They always hold MAX_ENTITIES worth of their component type, all pre-allocated. If accessing a component via a stored entity, a check against the stored entity's generation and the global version of the entity's generation must be performed. 
+
+Tags are special-cased components; they have no data aside from the component bitset. They act as boolean flags.
+
+Systems are data-processing functions, typically linked to a query, and often manipulate entity data or entities themselves.
+
+Queries select the entities you are interested in working on at a given time based on your component search criteria. You can require certain components to exist, or not exist, using filtering operations on bitsets. Queries do not update "live," so entity creation or deletion will not be visible until another query is created.
+
+The world is a container that synchronizes and stores entity and component state. The primary reason for its existence is that entity deletion requires you to know about the existence of all components in order to appropriately remove said entity from all component bitsets. It's otherwise just a convenience around independent access to entity state and component state.
