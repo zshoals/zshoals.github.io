@@ -60,7 +60,7 @@ A bitwise not of the entity bitset against IsTable would exclude all active enti
 
 Using bitsets to generate these queries is excellent for several reasons, most notably, it's really fast to generate them. Bitwise operations are very fast at a hardware level, and they are likely to be [vectorized](https://en.wikipedia.org/wiki/Automatic_vectorization) without any work on your part. Determining whether 128 (or more!) entities match your search criteria per operation is pretty neat to say the least.
 
-You might now understand why we organized our bitsets as belonging to the component arrays rather than to the entities themselves; easy, fast, and cheap querying is the reason why.
+You might now understand why we organized our bitsets as belonging to the component arrays rather than to the entities themselves; easy, fast, and cheap generation of an iteration list of entities matching our search criteria is the reason why. Even in extreme cases with large amounts of query operations and hundreds of queries, it's unlikely for your total query time to take more than half a millisecond combined. Well, in an optimized release build, anyway. It's not the fastest query solution, but it's still pretty good for the amount of effort we're putting in (read: little).
 
 In our ECS, queries are not cached and are generated on demand. They do not perform "live-updates," so any entity creation or deletion will not be visible until another query is executed.
 
@@ -76,6 +76,6 @@ Tags are special-cased components; they have no data aside from the component bi
 
 Systems are data-processing functions, typically linked to a query, and often manipulate entity data or entities themselves.
 
-Queries select the entities you are interested in working on at a given time based on your component search criteria. You can require certain components to exist, or not exist, using filtering operations on bitsets. Queries do not update "live," so entity creation or deletion will not be visible until another query is created.
+Queries select the entities you are interested in working on at a given time based on your component search criteria. You can require certain components to exist, or not exist, using filtering operations on bitsets. Queries do not update "live," so entity creation or deletion will not be visible until another query is created. We use queries to generate a list of entities to iterate over that match our search criteria.
 
 The world is a container that synchronizes and stores entity and component state. The primary reason for its existence is that entity deletion requires you to know about the existence of all components in order to appropriately remove said entity from all component bitsets. It's otherwise just a convenience around independent access to entity state and component state.
