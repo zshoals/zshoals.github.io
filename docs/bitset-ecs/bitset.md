@@ -33,6 +33,8 @@ Additionally, entities will be supported by a single **bitset**, essentially a v
 # Components
 Components will be one-time-allocated data arrays consisting of MAX_ENTITIES worth of data elements. This will be the case for every single component. Each component will have an accompanying bitset, an array with (MAX_ENTITIES / 32) worth of unsigned 32-bit integers. These bitsets will represent whether or not an entity has a particular component...but it's more appropriate to think of the component as having a particular entity.
 
+Someone will point out that this wastes a lot of memory, and that the data we will be iterating over in the future will not be tightly packed together. You are correct. However, our focus is not maximal performance or minimum memory usage; it's ease of implementation while gaining the benefits of the ECS design pattern. Additionally, I've run some math on the memory usage before. Even in very pessimistic cases (but like, actually reality based, so again no 10000000000000 element boids simulation), you're using maybe 150 megabytes of RAM total for the entire ECS state, with a lot of it unused. That's like half of a Firefox tab, so I'm not really going to cry about it. If you absolutely need to minimize memory usage, or you need really high entity counts, this is not the implementation for you.
+
 There's not really to much to components; they're just arrays of data that you can index into via the ID bits of an entity.
 
 # Tags
@@ -44,15 +46,15 @@ Systems can do anything; they're just processing functions, so you might see ope
 # Queries
 Queries are a way to search for the particular entity handles that you are interested in processing at any given time. If we wanted to match all Active Entities with the components Position and Rotatable, and the tag Enemy, but excluding Bosses, a query would give us all entities that match the search parameters.
 
-In our ECS, the entity active/inactive bitset, and the component array bitsets will be used to generate queries. Starting with the entity bitset, we'll perform bitwise and/or/not operations against every component type that we may/may not be interested in. 
+In our ECS, the entity active/inactive bitset, and the component array bitsets will be used to generate queries. Starting with the entity bitset, we'll perform bitwise and/or/not operations against every component type that we may/may not be interested in. After we've performed all of our query operations, we'll iterate over the resulting bitset which will conveniently contain entities matching our query terms. 
 
-A bitwise and of the entity bitset against Position and Rotatable would only collect entities with BOTH of these components.
+A bitwise and of the entity bitset against Position and Rotatable would only collect active entities with BOTH of these components.
 
-A bitwise or of the entity bitset against Enemy and Player would collect any entity that has at least one of these components. Note that bitwise or queries require greater care to work with in your systems; in a bitset ECS, you'll need to perform a manual check to determine which one (or both) of these components the entity actually has. You know it has at least one or the other, however.
+A bitwise or of the entity bitset against Enemy and Player would collect any active entity that has at least one of these components. Note that bitwise or queries require greater care to work with in your systems; in a bitset ECS, you'll need to perform a manual check to determine which one (or both) of these components the entity actually has. You know it has at least one or the other, however.
 
-A bitwise not of the entity bitset against IsTable would exclude all entities that are tables in the entire game. With a naive setup, note that bitwise nots are *order dependent*. I won't be putting any special handling for queries in this implementation, so all exclusion queries should be added AFTER bitwise ands and ors.
-
-You might now understand why we organized our bitsets as belonging to the component arrays rather than to the entities themselves; easy, fast, and cheap querying is the reason why.
+A bitwise not of the entity bitset against IsTable would exclude all active entities that are tables in the entire game. Note that bitwise nots are *order dependent*, so with a naive implementation and no automated reordering of your query operations you may get results that you aren't expecting. I won't be putting any special handling for query operations in this implementation, so all nots should be added AFTER bitwise ands and ors.
 
 Using bitsets to generate these queries is excellent for several reasons, most notably, it's really fast to generate them. Bitwise operations are very fast at a hardware level, and they are likely to be [vectorized](https://en.wikipedia.org/wiki/Automatic_vectorization) without any work on your part. Determining whether 128 (or more!) entities match your search criteria per operation is pretty neat to say the least.
+
+You might now understand why we organized our bitsets as belonging to the component arrays rather than to the entities themselves; easy, fast, and cheap querying is the reason why.
 
