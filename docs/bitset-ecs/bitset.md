@@ -17,7 +17,7 @@ There are many varieties or ECS designs, and you can research some of these keyw
 - [Specs](https://github.com/amethyst/specs)
 - [EntityX](https://github.com/alecthomas/entityx)
 
-The general idea behind this bitset design is fairly simple but it can initially be a lot to take in. Let's break it down:
+The general idea behind this bitset design is fairly simple but that does not mean I can explain everything we're doing in 20 words unfortunately. Let's break it down:
 
 # Entities
 Entities will be represented as an index into a particular component array slot, combined with a **generation**. Both the entity ID/handle and generation will be stored in a single unsigned 64-bit integer. The ID portion will be stored in the lower bits of the integer, and the generation in the upper bits of the integer. How many bits are consumed by the ID and how many by the generation are up to you, but general limitations of the bitset ECS design will likely lead you to have a rather small ID limit and a very massive generation limit.
@@ -31,16 +31,28 @@ For purposes we'll get into later, we'll want a value representing the MAX_ENTIT
 Additionally, entities will be supported by a single **bitset**, essentially a very compact list of boolean flags. The bitset will consist of (MAX_ENTITIES / 32) worth of unsigned 32-bit integers, which will be the backing storage for these bools. This bitset will indicate whether an entity is alive or dead, or alternatively active or inactive. Note that this bitset is NOT storing which components that each entity has, although other bitset ECSs sometimes use this approach. We only store the active/inactive state here.
 
 # Components
-Components will be one-time-allocated data arrays consisting of MAX_ENTITIES worth of data elements. This will be the case for every single component. Each component will have an accompanying bitset, an array with (MAX_ENTITIES / 32) worth of unsigned 32-bit integers. These bitsets will represent whether or not an entity has a particular component...but it's more appropriate to think of the component having a particular entity.
+Components will be one-time-allocated data arrays consisting of MAX_ENTITIES worth of data elements. This will be the case for every single component. Each component will have an accompanying bitset, an array with (MAX_ENTITIES / 32) worth of unsigned 32-bit integers. These bitsets will represent whether or not an entity has a particular component...but it's more appropriate to think of the component as having a particular entity.
 
-There's not really to much to components; they're just arrays of data that you can index into via an entity handle.
+There's not really to much to components; they're just arrays of data that you can index into via the ID bits of an entity.
 
 # Tags
 Tags are special cased components. They're often used as on/off flags to indicate functionality that an entity may have (Movable, Rotatable, CanShoot, etc.). In our bitset ECS, we'll simply treat a tag as a component with empty storage and only the bitset.
 
 # Systems
-Systems can do anything; they're just processing functions, so you might see operations like modifying component data via an entity index, creating new entities, deleting entities, interfacing with other functionality of a library like SDL, whatever. They're just functions. A query will be a series of bitwise ands, ors, and nots, .
+Systems can do anything; they're just processing functions, so you might see operations in them like modifying component data via an entity index, creating new entities, deleting entities, interfacing with other functionality of a library like SDL, whatever.
 
+# Queries
+Queries are a way to search for the particular entity handles that you are interested in processing at any given time. If we wanted to match all Active Entities with the components Position and Rotatable, and the tag Enemy, but excluding Bosses, a query would give us all entities that match the search parameters.
 
+In our ECS, the entity active/inactive bitset, and the component array bitsets will be used to generate queries. Starting with the entity bitset, we'll perform bitwise and/or/not operations against every component type that we may/may not be interested in. 
 
+A bitwise and of the entity bitset against Position and Rotatable would only collect entities with BOTH of these components.
+
+A bitwise or of the entity bitset against Enemy and Player would collect any entity that has at least one of these components. Note that bitwise or queries require greater care to work with in your systems; in a bitset ECS, you'll need to perform a manual check to determine which one (or both) of these components the entity actually has. You know it has at least one or the other, however.
+
+A bitwise not of the entity bitset against IsTable would exclude all entities that are tables in the entire game. With a naive setup, note that bitwise nots are *order dependent*. I won't be putting any special handling for queries in this implementation, so all exclusion queries should be added AFTER bitwise ands and ors.
+
+You might now understand why we organized our bitsets as belonging to the component arrays rather than to the entities themselves; easy, fast, and cheap querying is the reason why.
+
+Using bitsets to generate these queries is excellent for several reasons, most notably, it's really fast to generate them. Bitwise operations are very fast at a hardware level, and they are likely to be [vectorized](https://en.wikipedia.org/wiki/Automatic_vectorization) without any work on your part. Determining whether 128 (or more!) entities match your search criteria per operation is pretty neat to say the least.
 
