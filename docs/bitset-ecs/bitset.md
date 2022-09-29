@@ -1,12 +1,14 @@
 # **A Bitset Entity-Component-System in C99**
 
 # What is an ECS
-If you're reading this, you probably know what an Entity-Component-System (ECS) is already. If you need a really giant overview of this concept, check out this [ECS FAQ](https://github.com/SanderMertens/ecs-faq) However, here's a quick refresher.
+If you're reading this, you probably know what an Entity-Component-System (ECS) is already. If you need a really giant overview of this concept, check out this [ECS FAQ](https://github.com/SanderMertens/ecs-faq). However, here's a quick refresher.
 
-Implementations differ, but the modern, generalized concept is a bunch of arrays storing contiguous or at least sequential data of the same type, say, 500 floats in a row. An **entity**, usually just an integer of some sort, indexes into these data arrays, otherwise known as **components**, in some fashion. There may or may not be a concept of a **tag**, which is almost the same as a component except without any associated data (a tag's presence essentially acts as a boolean flag). **Systems** are processing functions, usually accompanied by some sort of **query** that selects the entities owning certain components that you are actually interested in operating on within a particular system. There may be a **world**, which acts as a container that holds component arrays and entity data. A world is technically optional, but this concept arises due to issues pertaining to entity deletion.
+Implementations differ, but the modern, generalized concept is a bunch of arrays storing several instances of the same data, say, 500 floats in a row. An **entity**, usually just an integer of some sort, indexes into these data arrays, otherwise known as **components**, in some fashion. There may or may not be a concept of a **tag**, which is almost the same as a component except without any associated data (a tag's presence essentially acts as a boolean flag). **Systems** are processing functions, usually accompanied by some sort of **query** that selects the entities owning certain components that you are actually interested in operating on within a particular system. There may be a **world**, which acts as a container that holds component arrays and entity data. A world is technically optional, but this concept arises due to issues pertaining to entity deletion.
 
 # Why Make Another One?
-There are plenty of existing ECS solutions around the web (probably one of the best being [Flecs](https://github.com/SanderMertens/flecs)) Many of them are incredible feats of engineering! Many of them are also very complicated, and lean very far from the *actual* goal of what your average casual game developer likely wants: a conceptually simple and decently performant way to filter for the particular game objects they would like to work with at any given time. This really should not take a multi-thousand line codebase to achieve, and we should be able to keep our implementation in our heads. We shouldn't have to worry about "deferred updates" or multithreading or relationship graphs or whatever.
+There are plenty of existing ECS solutions around the web (probably one of the best being [Flecs](https://github.com/SanderMertens/flecs)) Many of them are incredible feats of engineering! Many of them are also very complicated, and lean very far from the *actual* goal of what your average casual game developer likely wants: a conceptually simple and decently performant way to filter for the particular game objects they would like to work with at any given time. This really should not take a multi-thousand line codebase to achieve, and we should be able to keep our implementation in our heads. We shouldn't have to worry about deferred updates or multithreading or relationship graphs or whatever. 
+
+I want to create new objects, modify the things they do and don't have, modify the values that those things have, and delete them sometimes. I want this to be easy and dynamic. 
 
 Let's keep it simple, and design something we won't be afraid to use.
 
@@ -65,7 +67,13 @@ You might now understand why we organized our bitsets as belonging to the compon
 In our ECS, queries are not cached and are generated on demand. They do not perform "live-updates," so any entity creation or deletion will not be visible until another query is executed.
 
 # World
-TODO: FILL ME IN ok
+The world is a data container, consisting of the entity master list thing we were hinting at before along with all component arrays that exist, and their bitsets. The world concept would ideally not be needed. We almost have everything we want already; we keep some master list of entity "references" to keep track of entity generations and available entities consumers can use, we create some component arrays and their bitsets, and then some functions that take pointers to the entity master list and the component arrays we want to work with. We execute a query in the system to generate a list to iterate over so we can safely extract data out of the arrays we've passed into the function.
+
+This works, up until you delete an entity. Deleting an entity requires removing its active state on **every component that exists**. Not doing so is just a straight error, because queries and direct checks against the array will indicate the entity still exists, even though it doesn't.
+
+You might think you could keep track of this manually, but you can't. Systems can dynamically add components or remove them from an entity individually at any time. Do you think you can manually delete an entity from its appropriate component arrays after 100 branching transformation functions? Probably not, so we have to shotgun the entire thing and guarantee that every component disables the correct entity on deletion. We also have to increment the entity's generation here.
+
+It's the kind of combined action that really should be taken care of by a larger container, so that's what the world is there for.
 
 # The Summary So Far, Because That Was a Lot of Words
 Entities are an unsigned 64-bit integer, with the 64-bits split between a generation that signifies the "uniqueness" of an entity, and a handle which indexes into component data arrays and component bitsets. We'll have a bitset that indicates the active and inactive state of these entities. There will be a "global" storage for these entities so that we can actually keep track of the generation and increment it. We'll maintain a freelist of entities so that we can hand out unused entities very quickly.
