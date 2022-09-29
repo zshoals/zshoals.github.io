@@ -19,12 +19,17 @@ There are many varieties or ECS designs, and you can research some of these keyw
 
 The general idea behind this bitset design is fairly simple but it can initially be a lot to take in. Let's break it down:
 
+# Entities
 Entities will be represented as an index into a particular component array slot, combined with a **generation**. Both the entity ID/handle and generation will be stored in a single unsigned 64-bit integer. The ID portion will be stored in the lower bits of the integer, and the generation in the upper bits of the integer. How many bits are consumed by the ID and how many by the generation are up to you, but general limitations of the bitset ECS design will likely lead you to have a rather small ID limit and a very massive generation limit.
+
+For purposes we'll get into later, we'll want a value representing the MAX_ENTITIES of our ECS, and this value should be a power of two that's at least 32 elements long. Nice starting counts are 2048, 4096, and 8192 entities. You'll notice we're not talking about values of 1000000000000 or whatever like a significant amount of other ECS implementations enjoy talking about. Practical memory limitations related to our bitset ECS design won't allow this and you're unlikely to need that many entities, ever. 
 
 Additionally, entities will be supported by a single **bitset**, essentially a very compact list of boolean flags. The bitset will consist of (MAX_ENTITIES / 32) worth of unsigned 32-bit integers, which will be the backing storage for these bools. This bitset will indicate whether an entity is alive or dead, or alternatively active or inactive. Note that this bitset is NOT storing which components that each entity has, although other bitset ECSs sometimes use this approach. 
 
+# Components
 Components will be one-time-allocated data arrays consisting of MAX_ENTITIES worth of data elements. This will be the case for every single component. Each component will have an accompanying bitset, an array with (MAX_ENTITIES / 32) worth of unsigned 32-bit integers. These bitsets will represent whether or not an entity has a particular component...but it's more appropriate to think of the component having a particular entity.
 
+# Systems
 Systems can do anything; they're just processing functions, so you might see operations like modifying component data via an entity index, creating new entities, deleting entities, interfacing with other functionality of a library like SDL, whatever. They're just functions. A query will be a series of bitwise ands, ors, and nots, .
 
 //TODO: MOVE ME
