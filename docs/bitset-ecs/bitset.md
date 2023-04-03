@@ -84,6 +84,6 @@ Tags are special-cased components; they have no data aside from the component bi
 
 Systems are data-processing functions, typically linked to a query, and often manipulate entity data or entities themselves.
 
-Queries select the entities you are interested in working on at a given time based on your component search criteria. You can require certain components to exist, or not exist, using filtering operations on bitsets. Queries do not update "live," so entity creation or deletion will not be visible until another query is created. We use queries to generate a list of entities to iterate over that match our search criteria.
+Queries generate a list of valid entity indices that can be used to access component arrays via iteration. You can require certain components to exist, or not exist, using filtering operations on bitsets. Queries do not update "live," so entity creation or deletion will not be visible until another query is created. We use queries to generate a list of entities to iterate over that match our search criteria.
 
 The world is a container that synchronizes and stores entity and component state. The primary reason for its existence is that entity deletion requires you to know about the existence of all components in order to appropriately remove said entity from all component bitsets. It's otherwise just a convenience around independent access to entity state and component state.
